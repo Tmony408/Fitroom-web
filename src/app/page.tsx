@@ -22,7 +22,7 @@ export default function Home() {
 
   useEffect(() => {
     if (loading || !user) return;
-    router.replace(user.role === 'DESIGNER' ? '/designer' : '/shop');
+    router.replace(user.role === 'ADMIN' ? '/admin' : user.role === 'DESIGNER' ? '/designer' : '/shop');
   }, [user, loading, router]);
 
   if (loading) return <div className="center"><div className="skeleton" style={{ width: 220, height: 22 }} /></div>;
