@@ -161,6 +161,33 @@ th{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;le
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .floaty{animation:floaty 6s ease-in-out infinite}
 .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:800px 100%;animation:shimmer 1.4s infinite;border-radius:12px}
+/* ---------- Site-wide motion polish ---------- */
+@keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* slow Ken Burns zoom/pan for the big feature photos (hero + auth) */
+@keyframes kenburns{
+  0%{transform:scale(1) translate(0,0)}
+  50%{transform:scale(1.09) translate(-1.5%,-1.2%)}
+  100%{transform:scale(1) translate(0,0)}
+}
+.kenburns{animation:kenburns 20s ease-in-out infinite;will-change:transform;transform-origin:center}
+/* every card + section heading eases in on mount (and on each navigation,
+   since the page template re-mounts) */
+.card{animation:riseIn .5s cubic-bezier(.22,.7,.2,1) both;
+  transition:transform .3s cubic-bezier(.22,.7,.2,1), box-shadow .3s, border-color .3s}
+h1,h2{animation:riseIn .55s cubic-bezier(.22,.7,.2,1) both}
+.eyebrow{animation:riseIn .5s ease both}
+/* interaction life */
+.btn:active{transform:translateY(0) scale(.96)}
+a .card:hover,.pcard:hover{transform:translateY(-4px);box-shadow:0 24px 60px -22px rgba(0,0,0,.85)}
+tbody tr{transition:background .18s}
+tbody tr:hover{background:rgba(255,255,255,.04)}
+.chip{transition:transform .2s, background .2s, border-color .2s}
+.chip:hover{transform:translateY(-1px)}
+.pill{transition:transform .2s}
+.stage{transition:background .35s, color .35s, border-color .35s, box-shadow .35s}
+.swatch,.meas{transition:transform .2s, border-color .2s}
+
+/* keep it accessible — must stay last so it wins */
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ---------- Mobile responsiveness ---------- */

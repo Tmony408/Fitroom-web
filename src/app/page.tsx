@@ -61,7 +61,7 @@ export default function Home() {
           initial={{ opacity: 0, scale: 0.94, rotate: -1 }}
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 0.7, 0.2, 1], delay: 0.15 }}>
-          <SmartImage src={images.hero} alt="African couture fashion" gradientIndex={0} />
+          <SmartImage src={images.hero} alt="African couture fashion" gradientIndex={0} className="kenburns" />
           <motion.div className="hero-badge" style={{ top: 18, left: 18 }}
             initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
             <div className="small muted">Recommended size</div>

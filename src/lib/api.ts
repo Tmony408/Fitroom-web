@@ -122,7 +122,10 @@ async function request<T>(path: string, opts: RequestInit = {}, retry = true): P
     throw new ApiError(res.status, msg);
   }
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  // Tolerate empty bodies (e.g. an endpoint returning null) — calling
+  // res.json() on an empty body throws "Unexpected end of JSON input".
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 const get = <T>(p: string) => request<T>(p);
 const post = <T>(p: string, body?: unknown) => request<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
