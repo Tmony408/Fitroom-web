@@ -23,7 +23,7 @@ export interface Product {
   images: string[]; sizeChart: SizeChart;
 }
 export interface Designer {
-  id: string; brand: string; location: string; leadTime: string;
+  id: string; handle?: string | null; brand: string; location: string; leadTime: string;
   specialties: string[]; verificationStatus: string; products?: Product[];
 }
 export type Measurements = Record<string, { val: number; conf: number }>;
@@ -45,7 +45,7 @@ export interface FitCheckResult {
   recommendedSize: string; fitConfidence: number; warnings: string[]; alternativeSize: string | null;
 }
 export interface DesignerDashboard {
-  designerId: string; brand: string; openRequests: number; activeOrders: number;
+  designerId: string; brand: string; handle?: string | null; openRequests: number; activeOrders: number;
   paidOrders: number; paidRevenueKobo: number; productCount: number;
 }
 export interface B2BPartner {
@@ -170,6 +170,7 @@ export const api = {
   createDesigner: (b: { brand: string; location: string; leadTime?: string; specialties?: string[] }) =>
     post<Designer>('/designers', b),
   getDesigner: (id: string) => get<Designer>(`/designers/${id}`),
+  getDesignerByHandle: (handle: string) => get<Designer>(`/designers/handle/${handle}`),
   designerDashboard: () => get<DesignerDashboard>('/designers/me/dashboard'),
 
   // analytics (Batch 5)

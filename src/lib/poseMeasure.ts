@@ -39,25 +39,72 @@ const conf = (v: number, base = 60, span = 32) =>
 export interface PoseMeasureResult { measurements: Measurements; modelVersion: string; staturePx: number }
 
 /**
- * Capture quality gate: is the whole body clearly visible? If not, the caller
- * should ask the user to retake rather than produce a poor estimate.
+ * Capture quality gate. Produces a 0..1 coverage score from how well the body
+ * is seen (visibility), whether the whole body is in frame, and whether the
+ * person is upright/square. We require >= 0.75 — below that the caller asks
+ * the user to retake rather than produce an unreliable estimate.
  */
-export function assessPose(p: PoseInput): { ok: boolean; reason: string } {
+export const MIN_CAPTURE_SCORE = 0.75;
+
+export function assessPose(p: PoseInput): { ok: boolean; reason: string; score: number } {
   const L = p.landmarks;
   const v = (i: number) => L[i]?.visibility ?? 0;
-  // shoulders, hips, ankles must be reasonably visible
-  const key = [I.L_SHO, I.R_SHO, I.L_HIP, I.R_HIP, I.L_ANK, I.R_ANK];
-  const avgVis = key.reduce((s, i) => s + v(i), 0) / key.length;
-  if (avgVis < 0.5) {
-    return { ok: false, reason: 'We couldn’t clearly see your shoulders, hips and legs. Stand in full view with a plain background and good lighting, then retake.' };
-  }
-  // the body should fill a good portion of the frame vertically
+
+  const key = [I.L_SHO, I.R_SHO, I.L_HIP, I.R_HIP, I.L_KNEE, I.R_KNEE, I.L_ANK, I.R_ANK];
+  const vis = key.reduce((s, i) => s + v(i), 0) / key.length; // 0..1
+
   const headY = Math.min(L[I.L_EYE].y, L[I.R_EYE].y);
   const footY = Math.max(L[I.L_ANK].y, L[I.R_ANK].y, L[I.L_HEEL].y, L[I.R_HEEL].y);
-  if ((footY - headY) < p.height * 0.45) {
-    return { ok: false, reason: 'Your body fills too little of the photo. Step back so your whole body (head to feet) is in frame, then retake.' };
+  const spanFrac = (footY - headY) / p.height;        // how much of the frame the body fills
+  const fullBody = Math.max(0, Math.min(1, spanFrac / 0.7));
+
+  const shoulderTilt = Math.abs(L[I.L_SHO].y - L[I.R_SHO].y) / p.height;
+  const upright = Math.max(0, Math.min(1, 1 - shoulderTilt / 0.08));
+
+  const score = 0.5 * vis + 0.3 * fullBody + 0.2 * upright;
+  // hard component gates so high visibility alone can't pass a bad framing/posture
+  const ok = score >= MIN_CAPTURE_SCORE && vis >= 0.6 && fullBody >= 0.6 && upright >= 0.4;
+
+  let reason = '';
+  if (!ok) {
+    if (vis < 0.6) reason = 'We couldn’t clearly see your full body. Stand in full view, plain background, good lighting, then retake.';
+    else if (fullBody < 0.6) reason = 'Make sure your whole body — head to feet — is in the frame, then retake.';
+    else if (upright < 0.4) reason = 'Stand straight and face the camera squarely, then retake.';
+    else reason = 'We couldn’t capture a clear enough view. Improve lighting and framing, then retake.';
   }
-  return { ok: true, reason: '' };
+  return { ok, reason, score };
+}
+
+export interface Guidance { ok: boolean; score: number; message: string }
+
+/**
+ * Real-time positioning feedback for the live camera (normalized 0..1 coords).
+ * Returns a single actionable instruction; `ok` means hold still to auto-capture.
+ */
+export function liveGuidance(
+  lm: { x: number; y: number; visibility?: number }[],
+  step: 'front' | 'side' = 'front',
+): Guidance {
+  const v = (i: number) => lm[i]?.visibility ?? 0;
+  const feetSeen = v(I.L_ANK) > 0.5 || v(I.R_ANK) > 0.5;
+  const shouldersSeen = (v(I.L_SHO) + v(I.R_SHO)) / 2 > 0.5;
+  if (!feetSeen || !shouldersSeen) return { ok: false, score: 0.2, message: 'Step back so your whole body is visible' };
+
+  const headY = Math.min(lm[I.L_EYE].y, lm[I.R_EYE].y);
+  const footY = Math.max(lm[I.L_ANK].y, lm[I.R_ANK].y);
+  const span = footY - headY;
+  if (span < 0.55) return { ok: false, score: 0.4, message: 'Move closer — fill the frame head to toe' };
+  if (footY > 0.99 || headY < 0.02) return { ok: false, score: 0.5, message: 'Step back a little — keep head and feet in view' };
+
+  const midX = (lm[I.L_HIP].x + lm[I.R_HIP].x) / 2;
+  if (Math.abs(midX - 0.5) > 0.14) {
+    return { ok: false, score: 0.55, message: midX < 0.5 ? 'Move right to center yourself' : 'Move left to center yourself' };
+  }
+  if (step === 'front') {
+    const tilt = Math.abs(lm[I.L_SHO].y - lm[I.R_SHO].y);
+    if (tilt > 0.06) return { ok: false, score: 0.6, message: 'Stand straight and square to the camera' };
+  }
+  return { ok: true, score: 0.95, message: 'Perfect — hold still' };
 }
 
 export function measurementsFromPose(

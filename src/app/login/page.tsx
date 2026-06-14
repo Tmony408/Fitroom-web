@@ -18,7 +18,9 @@ export default function LoginPage() {
     setError(''); setBusy(true);
     try {
       const u = await login(email, password);
-      router.replace(u.role === 'ADMIN' ? '/admin' : u.role === 'DESIGNER' ? '/designer' : '/shop');
+      const raw = new URLSearchParams(window.location.search).get('next');
+      const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+      router.replace(next ?? (u.role === 'ADMIN' ? '/admin' : u.role === 'DESIGNER' ? '/designer' : '/shop'));
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };

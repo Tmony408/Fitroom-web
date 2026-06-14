@@ -7,6 +7,9 @@ import { api, Measurements, FitPreference, FitProfile } from '@/lib/api';
 import { MEASUREMENT_FIELDS } from '@/lib/fields';
 import { downscaleImage } from '@/lib/image';
 import { useAuth } from '@/lib/auth';
+import dynamic from 'next/dynamic';
+
+const LiveCapture = dynamic(() => import('@/components/LiveCapture'), { ssr: false });
 
 type Mode = 'manual' | 'photo';
 const confColor = (c: number) => c >= 85 ? 'var(--emerald)' : c >= 65 ? 'var(--gold)' : '#ff8bc4';
@@ -47,6 +50,7 @@ function Manager() {
   const [heightCm, setHeightCm] = useState(175);
   const [estimating, setEstimating] = useState(false);
   const [retakeReason, setRetakeReason] = useState<string | null>(null);
+  const [useCamera, setUseCamera] = useState(false);
   const frontRef = useRef<HTMLInputElement>(null);
   const sideRef = useRef<HTMLInputElement>(null);
 
@@ -79,12 +83,13 @@ function Manager() {
 
   // Last-resort: server height-based estimate (used only if the model itself
   // can't load/run — not for "body not clearly visible", which asks to retake).
-  const runHeightFallback = async () => {
+  const runHeightFallback = async (fArg?: string, sArg?: string) => {
+    const f = fArg ?? front; const s = sArg ?? side;
     setError(''); setRetakeReason(null); setEstimating(true);
     try {
       if (!user?.consentBodyData) { await api.setConsent(true); await refresh(); }
       const session = await api.createScan({ declaredHeightCm: heightCm });
-      await api.uploadScanAssets(session.id, { front: front!, side: side!, qualityScore: 0.5 });
+      await api.uploadScanAssets(session.id, { front: f!, side: s!, qualityScore: 0.5 });
       const result = await api.generateScan(session.id, { declaredHeightCm: heightCm });
       if (result.measurements) setMeas(result.measurements);
       await api.deleteScan(session.id).catch(() => {});
@@ -97,8 +102,9 @@ function Manager() {
   // Estimate from photos. On-device MediaPipe pose detection → measurements in
   // the browser (photos never leave the device). If the body isn't clearly
   // visible, ask the user to RETAKE rather than guessing.
-  const estimate = async () => {
-    if (!front || !side) { setError('Add both a front and a side photo first.'); return; }
+  const estimate = async (fArg?: string, sArg?: string) => {
+    const f = fArg ?? front; const s = sArg ?? side;
+    if (!f || !s) { setError('Add both a front and a side photo first.'); return; }
     if (!consent) { setError('Please accept body-data consent before scanning.'); return; }
     setError(''); setRetakeReason(null); setEstimating(true);
     try {
@@ -113,11 +119,11 @@ function Manager() {
         const pose: Promise<Outcome> = (async () => {
           const { detectPose } = await import('@/lib/poseDetect');
           const { measurementsFromPose, assessPose } = await import('@/lib/poseMeasure');
-          const fp = await detectPose(front);
+          const fp = await detectPose(f);
           if (!fp) return { kind: 'retake', reason: 'We couldn’t detect a body in your front photo. Stand in full view, plain background, good lighting, then retake.' };
           const q = assessPose(fp);
           if (!q.ok) return { kind: 'retake', reason: q.reason };
-          const sp = await detectPose(side).catch(() => null);
+          const sp = await detectPose(s).catch(() => null);
           const sideOk = !!sp && assessPose(sp).ok;
           return { kind: 'ok', measurements: measurementsFromPose(fp, heightCm, { sideAvailable: sideOk }).measurements };
         })();
@@ -133,7 +139,7 @@ function Manager() {
       } else if (outcome.kind === 'retake') {
         setRetakeReason(outcome.reason); // stay in photo mode and prompt a retake
       } else {
-        await runHeightFallback(); // model couldn't load/run → height estimate
+        await runHeightFallback(f, s); // model couldn't load/run → height estimate
       }
     } catch (e) { setError((e as Error).message); }
     finally { setEstimating(false); }
@@ -221,32 +227,49 @@ function Manager() {
         <AnimatePresence mode="wait">
           {mode === 'photo' ? (
             <motion.div key="photo" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <p className="muted small">Tell us your height, then upload a front and side photo (plain background, good lighting, fitted clothing). We estimate your measurements — you review before saving.</p>
+              <p className="muted small">Tell us your height, then add a front and side photo — upload them, or use the live camera that lines you up and snaps automatically. We estimate on your device; you review before saving.</p>
               <div style={{ maxWidth: 220, marginTop: 10 }}>
                 <label>Your height (cm)</label>
                 <input type="number" min={120} max={230} value={heightCm} onChange={(e) => setHeightCm(Number(e.target.value))} />
               </div>
-              <div className="grid2" style={{ marginTop: 12 }}>
-                {([['front', front, frontRef, onPick('front')], ['side', side, sideRef, onPick('side')]] as const).map(([key, url, ref, handler]) => (
-                  <div key={key} className="hero-img" style={{ aspectRatio: '3/4', cursor: 'pointer', background: 'rgba(255,255,255,.04)' }} onClick={() => ref.current?.click()}>
-                    {url
-                      ? <img src={url} alt={`${key} photo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <div style={{ display: 'grid', placeItems: 'center', height: '100%', textAlign: 'center' }}><div><div style={{ fontSize: 34 }}>{key === 'front' ? '🧍' : '🚶'}</div><div className="muted small" style={{ marginTop: 6 }}>Tap to add {key} photo</div></div></div>}
-                    <input ref={ref} type="file" accept="image/*" onChange={handler} style={{ display: 'none' }} />
-                  </div>
-                ))}
+              <div className="row" style={{ gap: 8, marginTop: 12 }}>
+                <button type="button" className={!useCamera ? 'btn sm' : 'btn ghost sm'} onClick={() => setUseCamera(false)}>📁 Upload photos</button>
+                <button type="button" className={useCamera ? 'btn sm' : 'btn ghost sm'} onClick={() => setUseCamera(true)}>📷 Live camera</button>
               </div>
-              <button className="btn alt" style={{ marginTop: 14, width: '100%' }} onClick={estimate} disabled={estimating || !front || !side}>{estimating ? 'Analysing photos…' : '⚡ Estimate my measurements'}</button>
+
+              {useCamera ? (
+                <div style={{ marginTop: 12 }}>
+                  <LiveCapture
+                    onComplete={(f, s) => { setFront(f); setSide(s); setUseCamera(false); estimate(f, s); }}
+                    onCancel={() => setUseCamera(false)}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="grid2" style={{ marginTop: 12 }}>
+                    {([['front', front, frontRef, onPick('front')], ['side', side, sideRef, onPick('side')]] as const).map(([key, url, ref, handler]) => (
+                      <div key={key} className="hero-img" style={{ aspectRatio: '3/4', cursor: 'pointer', background: 'rgba(255,255,255,.04)' }} onClick={() => ref.current?.click()}>
+                        {url
+                          ? <img src={url} alt={`${key} photo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <div style={{ display: 'grid', placeItems: 'center', height: '100%', textAlign: 'center' }}><div><div style={{ fontSize: 34 }}>{key === 'front' ? '🧍' : '🚶'}</div><div className="muted small" style={{ marginTop: 6 }}>Tap to add {key} photo</div></div></div>}
+                        <input ref={ref} type="file" accept="image/*" onChange={handler} style={{ display: 'none' }} />
+                      </div>
+                    ))}
+                  </div>
+                  <button className="btn alt" style={{ marginTop: 14, width: '100%' }} onClick={() => estimate()} disabled={estimating || !front || !side}>{estimating ? 'Analysing photos…' : '⚡ Estimate my measurements'}</button>
+                </>
+              )}
+
               {retakeReason && (
                 <div className="card tight" style={{ borderColor: 'rgba(245,179,1,.6)', marginTop: 12 }}>
                   <div className="small">📷 {retakeReason}</div>
                   <div className="row" style={{ marginTop: 10 }}>
-                    <button className="btn sm" onClick={() => { setFront(null); setSide(null); setRetakeReason(null); }}>Retake photos</button>
-                    <button className="btn ghost sm" onClick={runHeightFallback}>Use height estimate instead</button>
+                    <button className="btn sm" onClick={() => { setFront(null); setSide(null); setRetakeReason(null); }}>Retake</button>
+                    <button className="btn ghost sm" onClick={() => runHeightFallback()}>Use height estimate instead</button>
                   </div>
                 </div>
               )}
-              <div className="hint">Your photos are analysed <b>on your device</b> (they don’t leave your phone/computer) to estimate measurements. First run downloads a small model. If a body can’t be detected, we fall back to a height-based estimate. Every value stays editable below.</div>
+              <div className="hint">Analysed <b>on your device</b> — photos never leave your phone/computer. First run downloads a small model. If a clear full-body view can’t be captured (~75% quality), you’ll be asked to retake.</div>
             </motion.div>
           ) : (
             <motion.div key="manual" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>

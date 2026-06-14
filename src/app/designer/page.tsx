@@ -10,6 +10,28 @@ const statusPill = (s: string) =>
   ['PAID', 'CUTTING', 'SEWING', 'QUALITY_CHECK', 'SHIPPED', 'DELIVERED'].includes(s) ? 'good'
     : s === 'QUOTED' ? 'info' : s === 'CANCELLED' ? 'bad' : 'warn';
 
+function StoreLink({ handle, brand }: { handle: string; brand: string }) {
+  const [origin, setOrigin] = useState('');
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+  const url = origin ? `${origin}/d/${handle}` : `/d/${handle}`;
+  const copy = () => {
+    navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
+  return (
+    <FadeIn>
+      <div className="card glow-border">
+        <div className="muted small">🔗 Your store link — share it so customers order from {brand} directly</div>
+        <div className="row" style={{ marginTop: 8, alignItems: 'center' }}>
+          <code style={{ flex: 1, minWidth: 0, wordBreak: 'break-all', fontSize: 13 }}>{url}</code>
+          <button className="btn sm" onClick={copy}>{copied ? 'Copied ✓' : 'Copy link'}</button>
+          <a className="btn ghost sm" href={`/d/${handle}`} target="_blank" rel="noreferrer">Preview</a>
+        </div>
+      </div>
+    </FadeIn>
+  );
+}
+
 function Dashboard() {
   const [kpi, setKpi] = useState<DesignerDashboard | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -46,6 +68,8 @@ function Dashboard() {
         <p className="sub">Incoming custom orders, quotes, and production — no more WhatsApp threads.</p>
       </FadeIn>
       {error && <div className="error">{error}</div>}
+
+      {kpi?.handle && <StoreLink handle={kpi.handle} brand={kpi.brand} />}
 
       <Reveal className="kpi">
         {cards.map((c) => (

@@ -20,7 +20,9 @@ export default function RegisterPage() {
     setError(''); setBusy(true);
     try {
       const u = await register({ name, email, password, role });
-      router.replace(u.role === 'DESIGNER' ? '/designer/onboard' : '/fit-profile');
+      const raw = new URLSearchParams(window.location.search).get('next');
+      const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+      router.replace(next ?? (u.role === 'DESIGNER' ? '/designer/onboard' : '/fit-profile'));
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
