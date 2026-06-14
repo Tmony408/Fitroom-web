@@ -60,6 +60,27 @@ export function Item({ children, className, style }: {
   );
 }
 
+/**
+ * Scroll-reveal: animates in each time it enters the viewport (fade + lift +
+ * slight zoom). `once: false` so it re-triggers as you scroll up/down.
+ */
+export function ScrollIn({ children, delay = 0, className, style }: {
+  children: ReactNode; delay?: number; className?: string; style?: React.CSSProperties;
+}) {
+  return (
+    <motion.div
+      className={className}
+      style={style}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: false, amount: 0.25 }}
+      transition={{ duration: 0.55, ease, delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 /** Hover-spring wrapper for interactive cards. */
 export function Hover({ children, className, style }: {
   children: ReactNode; className?: string; style?: React.CSSProperties;

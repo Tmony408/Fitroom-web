@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
 import SmartImage from '@/components/SmartImage';
-import { FadeIn, Reveal, Item, Hover } from '@/components/motion';
+import { FadeIn, ScrollIn } from '@/components/motion';
 import { useSiteSettings } from '@/lib/useSiteSettings';
 
 const STEPS = [
@@ -77,45 +77,41 @@ export default function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <Reveal>
-        <Item><h2>From measurements to delivery</h2></Item>
-        <div className="grid3" style={{ marginTop: 8 }}>
-          {STEPS.map((s) => (
-            <Item key={s.t}>
-              <Hover className="card" style={{ height: '100%' }}>
-                <div className="feature">
-                  <div className="ic">{s.ic}</div>
-                  <div><h3>{s.t}</h3><p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>{s.d}</p></div>
-                </div>
-              </Hover>
-            </Item>
-          ))}
-        </div>
-      </Reveal>
+      <ScrollIn><h2>From measurements to delivery</h2></ScrollIn>
+      <div className="grid3" style={{ marginTop: 8 }}>
+        {STEPS.map((s, i) => (
+          <ScrollIn key={s.t} delay={i * 0.08}>
+            <div className="card" style={{ height: '100%' }}>
+              <div className="feature">
+                <div className="ic">{s.ic}</div>
+                <div><h3>{s.t}</h3><p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>{s.d}</p></div>
+              </div>
+            </div>
+          </ScrollIn>
+        ))}
+      </div>
 
-      {/* GALLERY — many garment types, each with its own matching picture */}
-      <Reveal>
-        <Item><h2>Styles we tailor</h2></Item>
-        <div className="cards" style={{ marginTop: 8 }}>
-          {images.gallery.map((g, i) => (
-            <Item key={g.label}>
-              <Hover className="card pcard">
-                <div className="ph"><SmartImage src={g.src} alt={g.label} gradientIndex={i} /></div>
-                <div className="meta"><span className="chip">{g.label}</span></div>
-              </Hover>
-            </Item>
-          ))}
-        </div>
-      </Reveal>
+      {/* GALLERY — scroll-reveals each garment image as it enters the viewport */}
+      <ScrollIn><h2>Styles we tailor</h2></ScrollIn>
+      <div className="cards" style={{ marginTop: 8 }}>
+        {images.gallery.map((g, i) => (
+          <ScrollIn key={g.label} delay={(i % 4) * 0.07}>
+            <div className="card pcard" style={{ height: '100%' }}>
+              <div className="ph"><SmartImage src={g.src} alt={g.label} gradientIndex={i} /></div>
+              <div className="meta"><span className="chip">{g.label}</span></div>
+            </div>
+          </ScrollIn>
+        ))}
+      </div>
 
       {/* CTA */}
-      <FadeIn>
+      <ScrollIn>
         <div className="card glow-border" style={{ textAlign: 'center', padding: 40, marginTop: 26 }}>
           <h2 style={{ marginTop: 0 }}>Your perfect fit is a few taps away.</h2>
           <p className="sub" style={{ margin: '0 auto 18px' }}>Join customers ordering bespoke African fashion with confidence.</p>
           <Link href="/register" className="btn">Get started free</Link>
         </div>
-      </FadeIn>
+      </ScrollIn>
     </div>
   );
 }
