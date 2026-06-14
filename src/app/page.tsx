@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import SmartImage from '@/components/SmartImage';
 import { FadeIn, ScrollIn } from '@/components/motion';
 import { useSiteSettings } from '@/lib/useSiteSettings';
+import { slugify } from '@/lib/images';
 
 const STEPS = [
   { ic: '📐', t: 'Capture once', d: 'Save your measurements with a confidence score. Edit anytime — no tape-measure guesswork over WhatsApp.' },
@@ -91,15 +92,17 @@ export default function Home() {
         ))}
       </div>
 
-      {/* GALLERY — scroll-reveals each garment image as it enters the viewport */}
-      <ScrollIn><h2>Styles we tailor</h2></ScrollIn>
+      {/* GALLERY — each card opens that style's full collection */}
+      <ScrollIn><h2>Styles we tailor <span className="muted small" style={{ fontWeight: 400 }}>· tap any style to see the collection</span></h2></ScrollIn>
       <div className="cards" style={{ marginTop: 8 }}>
         {images.gallery.map((g, i) => (
           <ScrollIn key={g.label} delay={(i % 4) * 0.07}>
-            <div className="card pcard" style={{ height: '100%' }}>
-              <div className="ph"><SmartImage src={g.src} alt={g.label} gradientIndex={i} /></div>
-              <div className="meta"><span className="chip">{g.label}</span></div>
-            </div>
+            <Link href={`/styles/${slugify(g.label)}`}>
+              <div className="card pcard" style={{ height: '100%' }}>
+                <div className="ph"><SmartImage src={g.src} alt={g.label} gradientIndex={i} /></div>
+                <div className="meta"><span className="chip">{g.label}</span><span className="muted small">View →</span></div>
+              </div>
+            </Link>
           </ScrollIn>
         ))}
       </div>

@@ -53,6 +53,27 @@ export function categoryImage(category: string, i = 0): string {
   return GARMENTS[i % GARMENTS.length].src;
 }
 
+// URL-friendly slug for a style label, and the reverse lookup.
+export const slugify = (s: string) =>
+  (s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+export function labelFromSlug(slug: string): string | null {
+  const s = slugify(slug);
+  return GARMENTS.find((g) => slugify(g.label) === s)?.label ?? null;
+}
+
+// Curated seed images for a category collection — used to fill the gallery
+// before (and alongside) real designer uploads, so a style never looks empty.
+// Starts from the category's own image, then rotates the shared pool.
+export function categorySeed(label: string, count = 8): string[] {
+  const key = (label || '').toLowerCase();
+  let start = PINS.findIndex((p) => p === BY_LABEL[key]?.src);
+  if (start < 0) start = Math.abs([...key].reduce((a, c) => a + c.charCodeAt(0), 0)) % PINS.length;
+  const out: string[] = [];
+  for (let i = 0; i < Math.min(count, PINS.length); i++) out.push(PINS[(start + i) % PINS.length]);
+  return out;
+}
+
 export const IMAGES = {
   hero: DEFAULT_HERO,
   auth: DEFAULT_AUTH,

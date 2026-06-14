@@ -21,6 +21,7 @@ export interface Product {
   id: string; designerId: string; title: string; category: string;
   fabric: string; stretch: GarmentStretch; priceKobo: number;
   images: string[]; sizeChart: SizeChart;
+  designer?: { brand: string; handle?: string | null };
 }
 export interface Designer {
   id: string; handle?: string | null; brand: string; location: string; leadTime: string;
