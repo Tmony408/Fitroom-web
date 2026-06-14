@@ -4,6 +4,7 @@ import Protected from '@/components/Protected';
 import Counter from '@/components/Counter';
 import { FadeIn, Reveal, Item, Hover } from '@/components/motion';
 import { api, naira } from '@/lib/api';
+import { GARMENTS, DEFAULT_HERO, DEFAULT_AUTH } from '@/lib/images';
 
 type Overview = Awaited<ReturnType<typeof api.adminOverview>>;
 type Designer = Awaited<ReturnType<typeof api.adminDesigners>>[number];
@@ -24,15 +25,34 @@ function AdminDash() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
+  // appearance (admin-managed marketing images)
+  const [heroUrl, setHeroUrl] = useState('');
+  const [authUrl, setAuthUrl] = useState('');
+  const [gallery, setGallery] = useState<string[]>(GARMENTS.map(() => ''));
+  const [savedMsg, setSavedMsg] = useState('');
+
   const load = async () => {
     try {
-      const [o, d, ord, fi] = await Promise.all([
-        api.adminOverview(), api.adminDesigners(), api.adminOrders(), api.adminFitIssues(),
+      const [o, d, ord, fi, s] = await Promise.all([
+        api.adminOverview(), api.adminDesigners(), api.adminOrders(), api.adminFitIssues(), api.getSiteSettings(),
       ]);
       setOv(o); setDesigners(d); setOrders(ord); setIssues(fi);
+      if (s) {
+        setHeroUrl(s.heroUrl ?? ''); setAuthUrl(s.authUrl ?? '');
+        setGallery(GARMENTS.map((_, i) => s.gallery?.[i] ?? ''));
+      }
     } catch (e) { setError((e as Error).message); }
   };
   useEffect(() => { load(); }, []);
+
+  const saveAppearance = async () => {
+    setError(''); setSavedMsg(''); setBusy('appearance');
+    try {
+      await api.adminUpdateSiteSettings({ heroUrl: heroUrl.trim(), authUrl: authUrl.trim(), gallery: gallery.map((g) => g.trim()) });
+      setSavedMsg('Saved. Changes are live on the home and login pages.');
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(''); }
+  };
 
   const setStatus = async (id: string, status: 'VERIFIED' | 'SUSPENDED' | 'PENDING') => {
     setBusy(id);
@@ -131,6 +151,26 @@ function AdminDash() {
               ))}
           </div>
         </div>
+      </div>
+
+      <h2>Appearance — homepage &amp; login images</h2>
+      <div className="card">
+        <p className="muted small">Paste image URLs to replace the marketing photos. Leave a field blank to use the built-in default. Changes go live immediately.</p>
+        {savedMsg && <div className="card tight" style={{ borderColor: 'var(--emerald)' }}><span className="pill good">Saved</span> {savedMsg}</div>}
+        <div className="grid2" style={{ marginTop: 8 }}>
+          <div><label>Hero image (home)</label><input value={heroUrl} onChange={(e) => setHeroUrl(e.target.value)} placeholder={DEFAULT_HERO} /></div>
+          <div><label>Auth image (login/signup)</label><input value={authUrl} onChange={(e) => setAuthUrl(e.target.value)} placeholder={DEFAULT_AUTH} /></div>
+        </div>
+        <h3 style={{ marginTop: 16 }}>Gallery (“Styles we tailor”)</h3>
+        <div className="grid2">
+          {GARMENTS.map((g, i) => (
+            <div key={g.label}>
+              <label>{g.label}</label>
+              <input value={gallery[i] ?? ''} onChange={(e) => setGallery((arr) => arr.map((v, j) => (j === i ? e.target.value : v)))} placeholder={g.src} />
+            </div>
+          ))}
+        </div>
+        <button className="btn" style={{ marginTop: 16 }} onClick={saveAppearance} disabled={busy === 'appearance'}>{busy === 'appearance' ? 'Saving…' : 'Save images'}</button>
       </div>
     </div>
   );

@@ -8,8 +8,8 @@ import AuthShell from '@/components/AuthShell';
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState('customer@demo.io');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 

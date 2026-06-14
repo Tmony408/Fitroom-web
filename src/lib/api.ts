@@ -199,6 +199,11 @@ export const api = {
     id: string; orderId: string; note: string | null; createdAt: string; garment: string; customer: string; brand: string;
   }[]>('/admin/fit-issues'),
 
+  // site settings (admin-managed marketing imagery)
+  getSiteSettings: () => get<{ heroUrl: string | null; authUrl: string | null; gallery: string[] } | null>('/site-settings'),
+  adminUpdateSiteSettings: (b: { heroUrl?: string; authUrl?: string; gallery?: string[] }) =>
+    patch<{ heroUrl: string | null; authUrl: string | null; gallery: string[] }>('/site-settings', b),
+
   // B2B partner portal (Batch 6)
   createPartner: (b: { company: string; domain: string; webhookUrl?: string }) =>
     post<B2BPartner>('/b2b/partners', b),

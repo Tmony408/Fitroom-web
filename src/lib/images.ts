@@ -1,32 +1,46 @@
-// Keyword-matched imagery. We use LoremFlickr, which returns a real photo
-// tagged with the given keyword(s) — so the "agbada" slot shows agbada, the
-// "kaftan" slot shows kaftan, and so on. `lock` pins a stable photo per slot
-// (it won't change on every reload). Every <SmartImage> still falls back to a
-// branded gradient if a URL ever fails, so the UI never shows a broken image.
-//
-// Want exact shots? Replace any URL below with your own product photography or
-// a specific image URL — the structure and fallback stay the same.
+// Default site imagery. These are the fallbacks; admins can override the hero,
+// auth, and gallery images at runtime via the admin "Appearance" panel
+// (see useSiteSettings / /admin). Every <SmartImage> also degrades to a
+// branded gradient if a URL ever fails to load.
 
-const LF = (keywords: string, lock: number, w = 900, h = 1100) =>
-  `https://loremflickr.com/${w}/${h}/${encodeURIComponent(keywords)}?lock=${lock}`;
-
-export interface GarmentImage { label: string; keywords: string; src: string; }
-
-// One suiting picture per garment type — many types, not just agbada.
-export const GARMENTS: GarmentImage[] = [
-  { label: 'Agbada',     keywords: 'agbada,nigeria',                    src: LF('agbada,nigeria', 11) },
-  { label: 'Senator',    keywords: 'african,menswear,traditional',     src: LF('african,menswear,traditional', 12) },
-  { label: 'Kaftan',     keywords: 'kaftan,men',                       src: LF('kaftan,men', 13) },
-  { label: 'Aso Ebi',    keywords: 'asoebi,nigeria,fashion',          src: LF('asoebi,nigeria,fashion', 14) },
-  { label: 'Ankara',     keywords: 'ankara,african,fashion',          src: LF('ankara,african,fashion', 15) },
-  { label: 'Dashiki',    keywords: 'dashiki,african',                 src: LF('dashiki,african', 16) },
-  { label: 'Gele',       keywords: 'gele,headwrap,nigeria',           src: LF('gele,headwrap,nigeria', 17) },
-  { label: 'Bridal',     keywords: 'african,wedding,bride',           src: LF('african,wedding,bride', 18) },
-  { label: 'Buba & Iro', keywords: 'yoruba,traditional,clothing',     src: LF('yoruba,traditional,clothing', 19) },
-  { label: 'Native wear',keywords: 'african,traditional,clothing',    src: LF('african,traditional,clothing', 20) },
+const PINS = [
+  'https://i.pinimg.com/736x/45/0b/22/450b22fd887ba53199530bd1b573dcfa.jpg',   // 0
+  'https://i.pinimg.com/736x/df/3d/6a/df3d6a25bd1d8e064dce6d0d2a6fd196.jpg',   // 1
+  'https://i.pinimg.com/736x/49/ab/f7/49abf7bab18583139ec39a1d182b1130.jpg',   // 2
+  'https://i.pinimg.com/1200x/2c/27/f7/2c27f75a2ab62fb78d15050b5e1a5bac.jpg',  // 3 (hero)
+  'https://i.pinimg.com/736x/7b/b2/66/7bb266dc151be1e3d8f8c1fdf795b1de.jpg',   // 4
+  'https://i.pinimg.com/736x/de/7f/01/de7f017fb0b36ac6aaae498843bfa5c9.jpg',   // 5
+  'https://i.pinimg.com/736x/66/06/76/660676459714b9861ddb26674b64779b.jpg',   // 6
+  'https://i.pinimg.com/736x/1f/fd/d8/1ffdd82ef0bd4ab3b25c93ee212aa11a.jpg',   // 7
+  'https://i.pinimg.com/736x/47/f6/8c/47f68c6b2faa9d6dd1d0835eee881fa0.jpg',   // 8
+  'https://i.pinimg.com/736x/9a/96/9e/9a969e3fea81b69d078f4c3eeeec4505.jpg',   // 9
+  'https://i.pinimg.com/1200x/ab/bb/f3/abbbf3e25662109c77967649cff0f65e.jpg',  // 10 (auth)
+  'https://i.pinimg.com/736x/32/40/76/3240766027aae0079f62dc1a2a34fe2a.jpg',   // 11
+  'https://i.pinimg.com/736x/9b/df/72/9bdf720298d7f4331e746b4aa539d7f9.jpg',   // 12
+  'https://i.pinimg.com/736x/e8/d5/2e/e8d52e878e1c450a6207bffde403fe5f.jpg',   // 13
+  'https://i.pinimg.com/736x/ef/b2/01/efb201fb5a1cb5f789540492956c1792.jpg',   // 14
+  'https://i.pinimg.com/1200x/95/b4/ab/95b4ab874764aca47029c9760372dd94.jpg',  // 15
 ];
 
-// Quick lookup by category name used on products (Senator / Kaftan / Agbada…).
+export interface GarmentImage { label: string; src: string }
+
+export const DEFAULT_HERO = PINS[3];
+export const DEFAULT_AUTH = PINS[10];
+
+// One picture per garment type for the landing gallery + product fallbacks.
+export const GARMENTS: GarmentImage[] = [
+  { label: 'Agbada', src: PINS[0] },
+  { label: 'Senator', src: PINS[1] },
+  { label: 'Kaftan', src: PINS[2] },
+  { label: 'Aso Ebi', src: PINS[4] },
+  { label: 'Ankara', src: PINS[5] },
+  { label: 'Dashiki', src: PINS[6] },
+  { label: 'Gele', src: PINS[7] },
+  { label: 'Bridal', src: PINS[8] },
+  { label: 'Buba & Iro', src: PINS[9] },
+  { label: 'Native wear', src: PINS[11] },
+];
+
 const BY_LABEL: Record<string, GarmentImage> = Object.fromEntries(
   GARMENTS.map((g) => [g.label.toLowerCase(), g]),
 );
@@ -34,16 +48,14 @@ const BY_LABEL: Record<string, GarmentImage> = Object.fromEntries(
 export function categoryImage(category: string, i = 0): string {
   const key = (category || '').toLowerCase();
   if (BY_LABEL[key]) return BY_LABEL[key].src;
-  // partial match (e.g. "senator wear" -> "senator")
   const hit = GARMENTS.find((g) => key.includes(g.label.toLowerCase()) || g.label.toLowerCase().includes(key));
   if (hit) return hit.src;
   return GARMENTS[i % GARMENTS.length].src;
 }
 
 export const IMAGES = {
-  hero: LF('agbada,nigeria,fashion', 11, 1100, 1300),
-  auth: LF('african,fashion,portrait', 21, 1000, 1300),
-  // landing gallery = many garment types, each with its own matching picture
+  hero: DEFAULT_HERO,
+  auth: DEFAULT_AUTH,
   gallery: GARMENTS,
 } as const;
 

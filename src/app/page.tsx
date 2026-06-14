@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
 import SmartImage from '@/components/SmartImage';
 import { FadeIn, Reveal, Item, Hover } from '@/components/motion';
-import { IMAGES } from '@/lib/images';
+import { useSiteSettings } from '@/lib/useSiteSettings';
 
 const STEPS = [
   { ic: '📐', t: 'Capture once', d: 'Save your measurements with a confidence score. Edit anytime — no tape-measure guesswork over WhatsApp.' },
@@ -18,6 +18,7 @@ const TAGS = ['Senator', 'Kaftan', 'Agbada', 'Asoebi', 'Bridal', 'Native wear', 
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const images = useSiteSettings();
 
   useEffect(() => {
     if (loading || !user) return;
@@ -60,7 +61,7 @@ export default function Home() {
           initial={{ opacity: 0, scale: 0.94, rotate: -1 }}
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 0.7, 0.2, 1], delay: 0.15 }}>
-          <SmartImage src={IMAGES.hero} alt="African couture fashion" gradientIndex={0} />
+          <SmartImage src={images.hero} alt="African couture fashion" gradientIndex={0} />
           <motion.div className="hero-badge" style={{ top: 18, left: 18 }}
             initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
             <div className="small muted">Recommended size</div>
@@ -96,7 +97,7 @@ export default function Home() {
       <Reveal>
         <Item><h2>Styles we tailor</h2></Item>
         <div className="cards" style={{ marginTop: 8 }}>
-          {IMAGES.gallery.map((g, i) => (
+          {images.gallery.map((g, i) => (
             <Item key={g.label}>
               <Hover className="card pcard">
                 <div className="ph"><SmartImage src={g.src} alt={g.label} gradientIndex={i} /></div>
@@ -113,7 +114,6 @@ export default function Home() {
           <h2 style={{ marginTop: 0 }}>Your perfect fit is a few taps away.</h2>
           <p className="sub" style={{ margin: '0 auto 18px' }}>Join customers ordering bespoke African fashion with confidence.</p>
           <Link href="/register" className="btn">Get started free</Link>
-          <div className="hint" style={{ marginTop: 18, display: 'inline-block' }}>Demo (after seeding API · pass <b>Password123!</b>): customer@demo.io · designer@lagosroyale.com</div>
         </div>
       </FadeIn>
     </div>
