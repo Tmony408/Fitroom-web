@@ -20,6 +20,7 @@ export default function LiveCapture({
   const [holdPct, setHoldPct] = useState(0);
   const [error, setError] = useState('');
   const [captured, setCaptured] = useState(false); // brief flash after a shot
+  const [ready, setReady] = useState(false);
 
   // refs for the loop (avoid stale closures)
   const stepRef = useRef<'front' | 'side'>('front');
@@ -27,6 +28,7 @@ export default function LiveCapture({
   const goodSince = useRef<number | null>(null);
   const busy = useRef(false);
   const stop = useRef(false);
+  const manualRef = useRef<(() => void) | null>(null); // manual shutter
 
   useEffect(() => {
     stop.current = false;
@@ -45,6 +47,22 @@ export default function LiveCapture({
       return canvas.toDataURL('image/jpeg', 0.82);
     };
 
+    // commit a shot (auto OR manual): flash, advance front→side, then complete
+    const commitShot = (shot: string) => {
+      setCaptured(true); setTimeout(() => setCaptured(false), 350);
+      goodSince.current = null; setHoldPct(0);
+      if (stepRef.current === 'front') {
+        frontShot.current = shot;
+        stepRef.current = 'side'; setStep('side');
+        setMessage('Now turn to your side');
+      } else {
+        stop.current = true;
+        cancelAnimationFrame(raf);
+        stream?.getTracks().forEach((t) => t.stop());
+        onComplete(frontShot.current!, shot);
+      }
+    };
+
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 } }, audio: false });
@@ -52,6 +70,13 @@ export default function LiveCapture({
         const video = videoRef.current!;
         video.srcObject = stream;
         await video.play();
+        setReady(true);
+        // manual shutter — grab the current frame and advance, overriding auto
+        manualRef.current = () => {
+          const v = videoRef.current;
+          if (!v || v.readyState < 2 || stop.current) return;
+          commitShot(capture());
+        };
 
         const { getVideoLandmarker } = await import('@/lib/poseLive');
         const landmarker = await getVideoLandmarker();
@@ -78,19 +103,9 @@ export default function LiveCapture({
               const held = ts - goodSince.current;
               setHoldPct(Math.min(100, (held / HOLD_MS) * 100));
               if (held >= HOLD_MS) {
-                // auto-capture
-                const shot = capture();
-                setCaptured(true); setTimeout(() => setCaptured(false), 350);
-                goodSince.current = null; setHoldPct(0);
-                if (stepRef.current === 'front') {
-                  frontShot.current = shot;
-                  stepRef.current = 'side'; setStep('side');
-                  setMessage('Now turn to your side');
-                } else {
-                  stop.current = true;
-                  onComplete(frontShot.current!, shot);
-                  return;
-                }
+                const done = stepRef.current === 'side';
+                commitShot(capture()); // auto-capture
+                if (done) return;
               }
             } else {
               goodSince.current = null; setHoldPct(0);
@@ -142,9 +157,12 @@ export default function LiveCapture({
           )}
         </div>
       </div>
-      <div className="row" style={{ padding: 12, justifyContent: 'space-between' }}>
-        <span className="muted small">Stand back so your whole body fits the dashed guide. It snaps automatically.</span>
-        <button className="btn ghost sm" onClick={onCancel}>Cancel</button>
+      <div className="row" style={{ padding: 12, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <span className="muted small" style={{ flex: 1, minWidth: 160 }}>Stand back so your whole body fits the dashed guide. It snaps automatically — or tap Capture now.</span>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn sm" onClick={() => manualRef.current?.()} disabled={!ready || !!error}>📸 Capture now</button>
+          <button className="btn ghost sm" onClick={onCancel}>Cancel</button>
+        </div>
       </div>
     </div>
   );
