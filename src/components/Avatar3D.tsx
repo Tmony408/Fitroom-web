@@ -165,7 +165,7 @@ export default function Avatar3D({
       });
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
-  }, [measurements, garment, color, length]);
+  }, [measurements, garment, color, length, cloth]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 320 }} />;
 }

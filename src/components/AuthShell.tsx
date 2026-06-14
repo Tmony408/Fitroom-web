@@ -20,7 +20,7 @@ export default function AuthShell({ title, subtitle, children }: {
       </motion.div>
       <motion.div
         className="hero-img"
-        style={{ aspectRatio: 'auto', minHeight: 460 }}
+        style={{ aspectRatio: 'auto', minHeight: 'clamp(220px, 45vh, 460px)' }}
         initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.7, ease: [0.22, 0.7, 0.2, 1], delay: 0.1 }}>
         <SmartImage src={IMAGES.auth} alt="African fashion" gradientIndex={1} />

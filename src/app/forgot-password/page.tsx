@@ -7,11 +7,14 @@ import AuthShell from '@/components/AuthShell';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true);
-    try { await api.forgotPassword(email); setSent(true); } finally { setBusy(false); }
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await api.forgotPassword(email); setSent(true); }
+    catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -24,6 +27,7 @@ export default function ForgotPasswordPage() {
         </div>
       ) : (
         <form className="card glow-border" onSubmit={submit}>
+          {error && <div className="error">{error}</div>}
           <label>Email</label>
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
           <button className="btn" style={{ marginTop: 16, width: '100%' }} disabled={busy}>{busy ? 'Sending…' : 'Send reset link'}</button>

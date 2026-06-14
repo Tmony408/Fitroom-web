@@ -158,3 +158,33 @@ th{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;le
 .floaty{animation:floaty 6s ease-in-out infinite}
 .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:800px 100%;animation:shimmer 1.4s infinite;border-radius:12px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- Mobile responsiveness ---------- */
+@media (max-width: 720px){
+  .wrap{padding:0 14px}
+  main{padding:18px 0 64px}
+  /* nav: let it wrap to 2 rows instead of overflowing, hide the tag chip */
+  .nav-in{height:auto;min-height:56px;padding:8px 0;flex-wrap:wrap;gap:8px}
+  .nav>.wrap>.chip,.nav .nav-in>.chip{display:none}
+  .nav-links{gap:6px;margin-left:0;width:100%;justify-content:flex-start;overflow-x:auto}
+  .nav-links a,.nav-links button{padding:7px 11px;font-size:13px;white-space:nowrap}
+  .logo{font-size:18px}
+  /* wide tables scroll INSIDE their card instead of pushing the page */
+  .card{padding:16px;overflow-x:auto}
+  .card.tight{padding:12px}
+  table{font-size:12px}
+  th,td{padding:8px 8px}
+  h1{font-size:25px}h2{font-size:18px}
+  .big{font-size:22px}
+  .two,.grid2,.grid3,.cards{grid-template-columns:1fr}
+  .kpi{grid-template-columns:1fr 1fr;gap:10px}
+  .hero{padding:14px 0;gap:20px}
+  .hero-img{aspect-ratio:4/4}
+  .meas-grid{grid-template-columns:1fr 1fr}
+  .stage{min-width:46px;font-size:9px;padding:6px 2px}
+  pre{font-size:11px}
+}
+@media (max-width: 400px){
+  .kpi,.meas-grid{grid-template-columns:1fr}
+  .nav-links a,.nav-links button{padding:6px 9px;font-size:12px}
+}

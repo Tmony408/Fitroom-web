@@ -5,6 +5,7 @@ import Protected from '@/components/Protected';
 import { FadeIn, Reveal, Item, Hover } from '@/components/motion';
 import { api, Measurements, FitPreference, FitProfile } from '@/lib/api';
 import { MEASUREMENT_FIELDS } from '@/lib/fields';
+import { downscaleImage } from '@/lib/image';
 import { useAuth } from '@/lib/auth';
 
 type Mode = 'manual' | 'photo';
@@ -23,31 +24,6 @@ function defaults(): Measurements {
   const m: Measurements = {};
   MEASUREMENT_FIELDS.forEach((f) => { m[f.key] = { val: f.base, conf: 70 }; });
   return m;
-}
-
-/** Read a file, scale its longest side to <= maxDim, return a compact JPEG data URL. */
-async function downscaleImage(file: File, maxDim = 1280, quality = 0.82): Promise<string> {
-  const dataUrl: string = await new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = () => rej(new Error('read failed'));
-    r.readAsDataURL(file);
-  });
-  const img: HTMLImageElement = await new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = () => rej(new Error('decode failed'));
-    i.src = dataUrl;
-  });
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  const w = Math.max(1, Math.round(img.width * scale));
-  const h = Math.max(1, Math.round(img.height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL('image/jpeg', quality);
 }
 
 function Manager() {
@@ -70,6 +46,7 @@ function Manager() {
   const [side, setSide] = useState<string | null>(null);
   const [heightCm, setHeightCm] = useState(175);
   const [estimating, setEstimating] = useState(false);
+  const [retakeReason, setRetakeReason] = useState<string | null>(null);
   const frontRef = useRef<HTMLInputElement>(null);
   const sideRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +54,8 @@ function Manager() {
     try { setProfiles(await api.listFitProfiles()); } catch (e) { setError((e as Error).message); }
   };
   useEffect(() => { loadProfiles(); }, []);
+  // sync the consent checkbox once auth resolves (user may load after mount)
+  useEffect(() => { if (user?.consentBodyData) setConsent(true); }, [user]);
 
   const setVal = (k: string, v: number) => setMeas((m) => ({ ...m, [k]: { val: v, conf: 99 } }));
 
@@ -98,45 +77,64 @@ function Manager() {
     } catch { setError('Could not read that image — please try a different photo.'); }
   };
 
-  // Estimate from photos. Primary path: on-device MediaPipe pose detection →
-  // measurements computed in the browser (photos never leave the device).
-  // Fallback: server height-based heuristic if pose detection can't read a body.
+  // Last-resort: server height-based estimate (used only if the model itself
+  // can't load/run — not for "body not clearly visible", which asks to retake).
+  const runHeightFallback = async () => {
+    setError(''); setRetakeReason(null); setEstimating(true);
+    try {
+      if (!user?.consentBodyData) { await api.setConsent(true); await refresh(); }
+      const session = await api.createScan({ declaredHeightCm: heightCm });
+      await api.uploadScanAssets(session.id, { front: front!, side: side!, qualityScore: 0.5 });
+      const result = await api.generateScan(session.id, { declaredHeightCm: heightCm });
+      if (result.measurements) setMeas(result.measurements);
+      await api.deleteScan(session.id).catch(() => {});
+      setEstimated(true); setMode('manual');
+      setMsg('Estimated from your height — review each value before saving.');
+    } catch (e) { setError((e as Error).message); }
+    finally { setEstimating(false); }
+  };
+
+  // Estimate from photos. On-device MediaPipe pose detection → measurements in
+  // the browser (photos never leave the device). If the body isn't clearly
+  // visible, ask the user to RETAKE rather than guessing.
   const estimate = async () => {
     if (!front || !side) { setError('Add both a front and a side photo first.'); return; }
     if (!consent) { setError('Please accept body-data consent before scanning.'); return; }
-    setError(''); setEstimating(true);
+    setError(''); setRetakeReason(null); setEstimating(true);
     try {
       if (!user?.consentBodyData) { await api.setConsent(true); await refresh(); }
 
-      let measured: Measurements | null = null;
+      type Outcome =
+        | { kind: 'ok'; measurements: Measurements }
+        | { kind: 'retake'; reason: string }
+        | { kind: 'timeout' };
+      let outcome: Outcome = { kind: 'timeout' };
       try {
-        const pose = (async () => {
+        const pose: Promise<Outcome> = (async () => {
           const { detectPose } = await import('@/lib/poseDetect');
-          const { measurementsFromPose } = await import('@/lib/poseMeasure');
-          const [fp, sp] = await Promise.all([detectPose(front), detectPose(side)]);
-          return fp ? measurementsFromPose(fp, heightCm, { sideAvailable: !!sp }).measurements : null;
+          const { measurementsFromPose, assessPose } = await import('@/lib/poseMeasure');
+          const fp = await detectPose(front);
+          if (!fp) return { kind: 'retake', reason: 'We couldn’t detect a body in your front photo. Stand in full view, plain background, good lighting, then retake.' };
+          const q = assessPose(fp);
+          if (!q.ok) return { kind: 'retake', reason: q.reason };
+          const sp = await detectPose(side).catch(() => null);
+          const sideOk = !!sp && assessPose(sp).ok;
+          return { kind: 'ok', measurements: measurementsFromPose(fp, heightCm, { sideAvailable: sideOk }).measurements };
         })();
-        // Never hang: if the model download or detection stalls, give up after
-        // 20s and fall back to the height-based estimate below.
-        measured = await Promise.race<Measurements | null>([
+        outcome = await Promise.race<Outcome>([
           pose,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
+          new Promise<Outcome>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), 20000)),
         ]);
-      } catch { measured = null; }
+      } catch { outcome = { kind: 'timeout' }; }
 
-      if (measured) {
-        setMeas(measured);
+      if (outcome.kind === 'ok') {
+        setMeas(outcome.measurements); setEstimated(true); setMode('manual');
         setMsg('Estimated from your photos on your device — review each value, then save.');
+      } else if (outcome.kind === 'retake') {
+        setRetakeReason(outcome.reason); // stay in photo mode and prompt a retake
       } else {
-        // fallback: server estimate from height (no on-device body detected)
-        const session = await api.createScan({ declaredHeightCm: heightCm });
-        await api.uploadScanAssets(session.id, { front, side, qualityScore: 0.7 });
-        const result = await api.generateScan(session.id, { declaredHeightCm: heightCm });
-        if (result.measurements) setMeas(result.measurements);
-        await api.deleteScan(session.id).catch(() => {});
-        setMsg('Couldn’t detect a full body in the photos — estimated from your height instead. Use a clearer full-length photo for a photo-based estimate.');
+        await runHeightFallback(); // model couldn't load/run → height estimate
       }
-      setEstimated(true); setMode('manual');
     } catch (e) { setError((e as Error).message); }
     finally { setEstimating(false); }
   };
@@ -239,6 +237,15 @@ function Manager() {
                 ))}
               </div>
               <button className="btn alt" style={{ marginTop: 14, width: '100%' }} onClick={estimate} disabled={estimating || !front || !side}>{estimating ? 'Analysing photos…' : '⚡ Estimate my measurements'}</button>
+              {retakeReason && (
+                <div className="card tight" style={{ borderColor: 'rgba(245,179,1,.6)', marginTop: 12 }}>
+                  <div className="small">📷 {retakeReason}</div>
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button className="btn sm" onClick={() => { setFront(null); setSide(null); setRetakeReason(null); }}>Retake photos</button>
+                    <button className="btn ghost sm" onClick={runHeightFallback}>Use height estimate instead</button>
+                  </div>
+                </div>
+              )}
               <div className="hint">Your photos are analysed <b>on your device</b> (they don’t leave your phone/computer) to estimate measurements. First run downloads a small model. If a body can’t be detected, we fall back to a height-based estimate. Every value stays editable below.</div>
             </motion.div>
           ) : (

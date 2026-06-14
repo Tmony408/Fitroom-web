@@ -5,6 +5,7 @@ import SmartImage from '@/components/SmartImage';
 import { FadeIn, Reveal, Item, Hover } from '@/components/motion';
 import { api, Product, GarmentStretch, naira } from '@/lib/api';
 import { categoryImage } from '@/lib/images';
+import { downscaleImage } from '@/lib/image';
 import { useAuth } from '@/lib/auth';
 
 function Products() {
@@ -12,6 +13,7 @@ function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [needsProfile, setNeedsProfile] = useState(false);
 
   // new product form
   const [title, setTitle] = useState('');
@@ -30,7 +32,10 @@ function Products() {
     try {
       const d = await api.getDesigner((await api.designerDashboard()).designerId);
       setProducts(d.products ?? []);
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (/designer profile/i.test(msg)) setNeedsProfile(true); else setError(msg);
+    }
   };
   useEffect(() => { load(); }, []);
 
@@ -42,13 +47,14 @@ function Products() {
     if (!url) return;
     setImages((x) => [...x, url]); setLinkInput('');
   };
-  const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => setImages((x) => [...x, reader.result as string]); // data URL
-      reader.readAsDataURL(file);
-    });
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) { setError('Please choose image files only.'); continue; }
+      try { const url = await downscaleImage(file); setImages((x) => [...x, url]); }
+      catch { setError('Could not read that image — try another.'); }
+    }
+    e.target.value = ''; // allow re-selecting the same file
   };
   const removeImg = (i: number) => setImages((x) => x.filter((_, idx) => idx !== i));
 
@@ -56,15 +62,20 @@ function Products() {
     setError(''); setBusy(true);
     try {
       const sizeChart = { sizes: strs(sizes), chest: nums(chest), waist: nums(waist) };
+      if (sizeChart.sizes.length === 0) throw new Error('Add at least one size (e.g. S, M, L).');
       if (sizeChart.chest.length !== sizeChart.sizes.length || sizeChart.waist.length !== sizeChart.sizes.length) {
         throw new Error('Sizes, chest and waist must have the same number of entries.');
       }
+      if (!title.trim()) throw new Error('Give the product a title.');
+      if (!(Number(price) > 0)) throw new Error('Set a valid price.');
       await api.createProduct({ title, category, fabric, stretch, priceKobo: Number(price) * 100, sizeChart, images });
       setTitle(''); setImages([]);
       await load();
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
+
+  if (needsProfile) return <div className="card">You don’t have a designer profile yet. <a href="/designer/onboard" className="gradtext">Set one up</a> first.</div>;
 
   return (
     <div>

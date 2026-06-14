@@ -49,19 +49,23 @@ function Builder() {
     })();
   }, [productId]);
 
-  // live recommendation from the chosen measurement set
+  // live recommendation from the chosen measurement set (guard against stale
+  // responses overwriting a newer one)
   useEffect(() => {
+    let active = true;
     (async () => {
       const m = selected?.measurements;
       if (!product || !m?.chest || !m?.waist) { setRec(null); return; }
       try {
-        setRec(await api.fitCheck({
+        const r = await api.fitCheck({
           productId: product.id, chest: m.chest.val, waist: m.waist.val,
           chestConfidence: m.chest.conf, waistConfidence: m.waist.conf,
           fitPreference: selected!.fitPref,
-        }));
-      } catch { setRec(null); }
+        });
+        if (active) setRec(r);
+      } catch { if (active) setRec(null); }
     })();
+    return () => { active = false; };
   }, [product, selected]);
 
   const toggle = (a: string) => setAddons((x) => x.includes(a) ? x.filter((y) => y !== a) : [...x, a]);

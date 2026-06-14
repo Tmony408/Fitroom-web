@@ -38,6 +38,28 @@ const conf = (v: number, base = 60, span = 32) =>
 
 export interface PoseMeasureResult { measurements: Measurements; modelVersion: string; staturePx: number }
 
+/**
+ * Capture quality gate: is the whole body clearly visible? If not, the caller
+ * should ask the user to retake rather than produce a poor estimate.
+ */
+export function assessPose(p: PoseInput): { ok: boolean; reason: string } {
+  const L = p.landmarks;
+  const v = (i: number) => L[i]?.visibility ?? 0;
+  // shoulders, hips, ankles must be reasonably visible
+  const key = [I.L_SHO, I.R_SHO, I.L_HIP, I.R_HIP, I.L_ANK, I.R_ANK];
+  const avgVis = key.reduce((s, i) => s + v(i), 0) / key.length;
+  if (avgVis < 0.5) {
+    return { ok: false, reason: 'We couldn’t clearly see your shoulders, hips and legs. Stand in full view with a plain background and good lighting, then retake.' };
+  }
+  // the body should fill a good portion of the frame vertically
+  const headY = Math.min(L[I.L_EYE].y, L[I.R_EYE].y);
+  const footY = Math.max(L[I.L_ANK].y, L[I.R_ANK].y, L[I.L_HEEL].y, L[I.R_HEEL].y);
+  if ((footY - headY) < p.height * 0.45) {
+    return { ok: false, reason: 'Your body fills too little of the photo. Step back so your whole body (head to feet) is in frame, then retake.' };
+  }
+  return { ok: true, reason: '' };
+}
+
 export function measurementsFromPose(
   front: PoseInput,
   heightCm: number,
