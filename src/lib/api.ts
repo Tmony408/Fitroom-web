@@ -258,6 +258,11 @@ export const api = {
   alteration: (id: string, note: string) => post<OrderEvent>(`/orders/${id}/alteration`, { note }),
   cancelOrder: (id: string) => post<Order>(`/orders/${id}/cancel`),
   measurementSheet: (id: string) => get<{ orderId: string; customer: string; garment: string; fabric: string; recommendedSize?: string; measurements: Record<string, string> }>(`/orders/${id}/measurement-sheet`),
+
+  // 2D AI virtual try-on
+  tryOnStatus: () => get<{ provider: string }>('/tryon/status'),
+  tryOn: (b: { personImage: string; garmentImage: string; category?: string }) =>
+    post<{ imageDataUrl?: string; imageUrl?: string; provider: string; note?: string }>('/tryon', b),
 };
 
 export const naira = (kobo: number) => '₦' + Math.round(kobo / 100).toLocaleString();

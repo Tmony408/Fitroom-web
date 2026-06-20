@@ -18,6 +18,7 @@ export default function Nav() {
           </>}
           {user?.role === 'CUSTOMER' && <>
             <Link href="/shop">Shop</Link>
+            <Link href="/try-on">Try-on</Link>
             <Link href="/fit-profile">My measurements</Link>
             <Link href="/orders">My orders</Link>
             <button onClick={logout}>Log out</button>
